@@ -40,5 +40,9 @@ Anonymous user has read access but can't change the config.
 * password: admin
 > Changeable in the config tab.
 
+## Web UI
+![board](./doc/status_tab.png)
+![board](./doc/config_tab.png)
+
 ## Known bugs
 - [ ] the LEDs of the K2 and K3 output is swapped.
