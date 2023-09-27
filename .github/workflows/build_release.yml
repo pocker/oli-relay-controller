@@ -58,18 +58,12 @@ jobs:
         run: |
           pio run
           pio run -t buildfs
-      - name: Changelog
-        uses: scottbrenner/generate-changelog-action@master
-        id: Changelog
-        env:
-          REPO: ${{ github.repository }}
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - name: Creating github release
+        uses: "marvinpinto/action-automatic-releases@latest"
         with:
-          repo_token: "${{ github.ref }}"
-          automatic_release_tag: "latest"
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "${{ github.ref }}"
           prerelease: false
-          body: |
-            ${{ steps.Changelog.outputs.changelog }}
           files: |
             .pio/build/project.checksum
             .pio/build/**/firmware_*.bin
