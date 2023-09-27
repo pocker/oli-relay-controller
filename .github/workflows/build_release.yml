@@ -26,7 +26,7 @@ jobs:
           name: ui-component
           path: ./ui/dist
   build-fw:
-    permissions: write
+    permissions: write-all
     needs: build-ui
     name: Build Firwmare
     runs-on: ubuntu-latest
