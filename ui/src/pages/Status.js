@@ -8,14 +8,14 @@ import ProfileSelector from "../components/ProfileSelector";
 export default function Status() {
   return (
     <Grid container justifyContent="center" spacing={1}>
-      <Grid item xm={12} xl={3}>
+       <Grid item xs={12}>
+        <ProfileSelector />
+      </Grid>
+      <Grid item xs={12} md={3}>
         <Inputs />
       </Grid>
-      <Grid item xm={12} xl={3}>
+      <Grid item xs={12} md={3}>
         <Outputs />
-      </Grid>
-      <Grid item xm={12} xl={3}>
-        <ProfileSelector />
       </Grid>
     </Grid>
   );

@@ -1,6 +1,4 @@
 import React, { useContext } from "react";
-import { alpha, styled } from "@mui/material/styles";
-import { red, blue } from "@mui/material/colors";
 
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -9,9 +7,8 @@ import ListItemText from "@mui/material/ListItemText";
 import ListSubheader from "@mui/material/ListSubheader";
 import Switch from "@mui/material/Switch";
 
-import AcUnitIcon from "@mui/icons-material/AcUnit";
 import { StatusContext } from "../contexts/StatusContext";
-import InputIcon from '@mui/icons-material/Input';
+import InputIcon from "@mui/icons-material/Input";
 
 export default function Inputs() {
   const [status] = useContext(StatusContext);

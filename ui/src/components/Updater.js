@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 
 import Box from "@mui/material/Box";
-import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 
@@ -29,13 +28,17 @@ export default function Updater() {
   return (
     <Box component="form">
       <Typography variant="h4">Updater</Typography>
-      <TextField
-        label="Firmware"
-        variant="filled"
+      <Button
+        variant="contained"
+        color="secondary"
+        component="label"
         fullWidth
-        type="file"
+        style={{ marginBottom: "5px" }}
         onChange={(event) => onFimrwareSelect(event)}
-      />
+      >
+        {firmware ? firmware.name : "Select file"}
+        <input type="file" hidden />
+      </Button>
       <Button
         variant="contained"
         disabled={!firmware}

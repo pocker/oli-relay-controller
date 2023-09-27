@@ -1,14 +1,13 @@
 import React, { useState } from "react";
 
 import Grid from "@mui/material/Grid";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
 import Status from "./pages/Status";
 import Config from "./pages/Config";
 import StatusContextProvider from "./contexts/StatusContext";
+import { AppBar, Tab, Tabs, Toolbar, Typography } from "@mui/material";
 
 const darkTheme = createTheme({
   palette: {
@@ -16,27 +15,35 @@ const darkTheme = createTheme({
   },
 });
 
+const pages = [
+  { name: "Status", component: Status },
+  { name: "Config", component: Config },
+];
+
 export default function App() {
   const [tab, setTab] = useState(0);
-
-  const handleTabCahnge = (_, index) => setTab(index);
+  const handleTabChange = (_, index) => setTab(index);
+  const ActivePage = pages[tab].component;
 
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
+      <AppBar position="sticky">
+        <Toolbar>
+          <Typography style={{ marginRight: "15px" }}>
+            RelayController
+          </Typography>
+          <Tabs onChange={handleTabChange} value={tab}>
+            {pages.map((page, index) => (
+              <Tab label={page.name} value={index} />
+            ))}
+          </Tabs>
+        </Toolbar>
+      </AppBar>
       <Grid container paddingTop={2} justifyContent="center">
         <Grid item xs={8}>
-          <Tabs
-            value={tab}
-            onChange={handleTabCahnge}
-            sx={{ borderRight: 1, borderColor: "divider" }}
-          >
-            <Tab label="Status" />
-            <Tab label="Config" />
-          </Tabs>
           <StatusContextProvider>
-            {tab === 0 && <Status />}
-            {tab === 1 && <Config />}
+            <ActivePage />
           </StatusContextProvider>
         </Grid>
       </Grid>

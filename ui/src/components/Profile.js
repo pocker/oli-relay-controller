@@ -26,7 +26,7 @@ function encodeConfig(config) {
 }
 
 export default function Profile() {
-  const [status, refresh] = useContext(StatusContext);
+  const [status] = useContext(StatusContext);
   const [active, setActive] = useState(status.config.profile.active);
   const [configuration, setConfiguration] = useState([]);
 
@@ -55,10 +55,10 @@ export default function Profile() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>T1</TableCell>
-              <TableCell>T2</TableCell>
-              <TableCell>T3</TableCell>
-              <TableCell>
+              <TableCell align="center">T1</TableCell>
+              <TableCell align="center">T2</TableCell>
+              <TableCell align="center">T3</TableCell>
+              <TableCell align="center">
                 <FormControl>
                   <InputLabel>Profile</InputLabel>
                   <Select
@@ -77,7 +77,7 @@ export default function Profile() {
             {configuration.map((row, i) => (
               <TableRow>
                 {row.map((value, j) => (
-                  <TableCell>
+                  <TableCell align="center">
                     <Select
                       key={`${i}_${j}`}
                       value={value}
@@ -94,16 +94,16 @@ export default function Profile() {
                     </Select>
                   </TableCell>
                 ))}
-                <TableCell color="success">K{i + 1}</TableCell>
+                <TableCell align="center">K{i + 1}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
-      <Container>
-        <ButtonGroup>
+      <Container style={{ marginTop: "5px" }}>
+        <ButtonGroup fullWidth>
           <Button variant="contained" color="success" onClick={() => onSave()}>
-            Save
+            Save Profile {active + 1}
           </Button>
           <Button variant="outlined" color="error" onClick={() => onReset()}>
             Reset
