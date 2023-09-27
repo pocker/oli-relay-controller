@@ -7,23 +7,23 @@ jobs:
   build-ui:
     name: Build UI
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./ui
     steps:
       - uses: actions/checkout@v3
-      - name: Use Node.js $19.x
+      - name: Setup Node env
         uses: actions/setup-node@v3
         with:
           node-version: 19.x
           cache: "npm"
-      - run: npm ci
-      - run: npm run build --if-present
+      - name: Prod Build
+        working-directory: ./ui
+        run: npm ci
+        run: npm run build --if-present
       - name: Exporting artifacts
+        working-directory: ./ui
         uses: actions/upload-artifact@v3
         with:
           name: ui-component
-          path: ./ui/dist
+          path: ./dist
   build-fw:
     needs: build-ui
     name: Build Firwmare
