@@ -5,6 +5,20 @@
 
 ![board](./doc/board.png)
 
+## ESP Pinout
+| Name | IO     |
+|------|--------|
+| T_1  | GPIO21 |
+| T_2  | GPIO19 |
+| T_3  | GPIO18 |
+| K_1  | GPIO22 |
+| K_2  | GPIO17 |
+| K_3  | GPIO16 |
+| RX   | GPIO3  |  
+| TX   | GPIO1  |
+| RST  | EN     |
+| BOOT | GPIO0  |
+
 ## Connectors
 | Name  | Description                                |
 |-------|--------------------------------------------|
