@@ -1,0 +1,42 @@
+import React, { useContext, useState } from "react";
+
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import { StatusContext } from "../contexts/StatusContext";
+import { setUser } from "../services/configService";
+
+export default function User() {
+  const [status] = useContext(StatusContext);
+  const [username, setUsername] = useState(status.config.user.username);
+  const [password, setPassword] = useState("");
+
+  const onSave = () => {
+    setUser(username, password);
+  };
+
+  return (
+    <Box component="form">
+      <Typography variant="h4">User</Typography>
+      <TextField
+        label="Username"
+        variant="filled"
+        fullWidth
+        value={username}
+        onChange={(event) => setUsername(event.target.value)}
+      />
+      <TextField
+        label="Password"
+        variant="filled"
+        type="password"
+        fullWidth
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+      />
+      <Button variant="contained" fullWidth onClick={() => onSave()}>
+        Save
+      </Button>
+    </Box>
+  );
+}
