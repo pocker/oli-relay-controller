@@ -36,7 +36,7 @@ struct Config
 const Config DEFAULT_CONFIG = {
     0,
     {0, {0b000000, 0b000000, 0b000000, 0b000000, 0b000000, 0b000000}},
-    {"", "235196071"},
+    {"", ""},
     {"admin", "admin"}};
 
 typedef struct Config Config;

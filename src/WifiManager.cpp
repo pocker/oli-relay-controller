@@ -2,11 +2,14 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 void WifiManager::begin(Config *config)
 {
     this->config = config;
-    WiFi.begin();
+    this->connect();
+    MDNS.begin(this->DEFAULT_SSID);
+    MDNS.addService("http", "tcp", 80);
 }
 
 void WifiManager::loop()
