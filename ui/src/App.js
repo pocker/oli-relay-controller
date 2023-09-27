@@ -7,7 +7,14 @@ import CssBaseline from "@mui/material/CssBaseline";
 import Status from "./pages/Status";
 import Config from "./pages/Config";
 import StatusContextProvider from "./contexts/StatusContext";
-import { AppBar, Tab, Tabs, Toolbar, Typography } from "@mui/material";
+import {
+  AppBar,
+  Container,
+  Tab,
+  Tabs,
+  Toolbar,
+  Typography,
+} from "@mui/material";
 
 const darkTheme = createTheme({
   palette: {
@@ -40,13 +47,11 @@ export default function App() {
           </Tabs>
         </Toolbar>
       </AppBar>
-      <Grid container paddingTop={2} justifyContent="center">
-        <Grid item xs={8}>
-          <StatusContextProvider>
-            <ActivePage />
-          </StatusContextProvider>
-        </Grid>
-      </Grid>
+      <Container style={{ marginTop: "15px" }}>
+        <StatusContextProvider>
+          <ActivePage />
+        </StatusContextProvider>
+      </Container>
     </ThemeProvider>
   );
 }

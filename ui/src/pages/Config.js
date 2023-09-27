@@ -11,16 +11,16 @@ import Profile from "../components/Profile";
 export default function Config() {
   return (
     <Grid container justifyContent="center" spacing={3}>
-      <Grid item sm={12} md={6}>
+      <Grid item xs={12} md={6}>
         <Wifi />
       </Grid>
-      <Grid item sm={12} md={6}>
+      <Grid item xs={12} md={6}>
         <User />
       </Grid>
-      <Grid item sm={12} md={6}>
+      <Grid item xs={12} md={6}>
         <Updater />
       </Grid>
-      <Grid item sm={12} md={6}>
+      <Grid item xs={12} md={6}>
         <Misc />
       </Grid>
       <Grid item sm={12}>

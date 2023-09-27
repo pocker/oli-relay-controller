@@ -9,10 +9,10 @@ module.exports = {
   },
   devServer: {
     proxy: {
-      "/status": "http://192.168.0.61",
-      "/config": "http://192.168.0.61",
-      "/restart": "http://192.168.0.61",
-      "/update": "http://192.168.0.61",
+      "/status": "http://relay-controller.local",
+      "/config": "http://relay-controller.local",
+      "/restart": "http://relay-controller.local",
+      "/update": "http://relay-controller.local",
     },
   },
   module: {
