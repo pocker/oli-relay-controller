@@ -20,11 +20,10 @@ jobs:
           npm ci
           npm run build --if-present
       - name: Exporting artifacts
-        working-directory: ./ui
         uses: actions/upload-artifact@v3
         with:
           name: ui-component
-          path: ./dist
+          path: ./ui/dist
   build-fw:
     needs: build-ui
     name: Build Firwmare
