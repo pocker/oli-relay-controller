@@ -2,15 +2,14 @@
 #include <ArduinoJson.h>
 
 #include "pinout.h"
+#include "context.h"
 
-#include "config.h"
 #include "Controller.h"
 #include "RestServer.h"
 #include "Monitor.h"
 #include "WifiManager.h"
 
-Config *config;
-
+Context *context;
 Controller controller;
 Monitor monitor;
 WifiManager wifi;
@@ -51,8 +50,8 @@ void updateConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     JsonObject user = bodyJSON["user"];
     if (user.containsKey("username") && user.containsKey("password"))
     {
-      strncpy(config->user.username, user["username"], 10);
-      strncpy(config->user.password, user["password"], 10);
+      strncpy(context->config->user.username, user["username"], 10);
+      strncpy(context->config->user.password, user["password"], 10);
     }
   }
 
@@ -61,8 +60,8 @@ void updateConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     JsonObject wifi = bodyJSON["wifi"];
     if (wifi.containsKey("ssid") && wifi.containsKey("password"))
     {
-      strncpy(config->wifi.ssid, wifi["ssid"], 16);
-      strncpy(config->wifi.password, wifi["password"], 16);
+      strncpy(context->config->wifi.ssid, wifi["ssid"], 16);
+      strncpy(context->config->wifi.password, wifi["password"], 16);
     }
   }
 
@@ -71,7 +70,7 @@ void updateConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     JsonObject profile = bodyJSON["profile"];
     if (profile.containsKey("active"))
     {
-      config->profile.active = profile["active"];
+      context->config->profile.active = profile["active"];
     }
 
     if (profile.containsKey("configuration"))
@@ -81,13 +80,13 @@ void updateConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
       {
         for (int j = 0; j < OUTPUTS; j++)
         {
-          config->profile.configuration[i][j] = configuration[i][j];
+          context->config->profile.configuration[i][j] = configuration[i][j];
         }
       }
     }
   }
 
-  writeConfig(config);
+  writeConfig(context->config);
   request->send(200, "plain/text", "");
 }
 
@@ -104,18 +103,17 @@ void restart(AsyncWebServerRequest *request)
 void setup()
 {
   Serial.begin(115200);
-  initConfig();
-  config = loadConfig();
+  context = createContext();
 
-  controller.begin(config);
-  monitor.begin(config, controller.getContext());
-  wifi.begin(config);
+  controller.begin(context);
+  monitor.begin(context);
+  wifi.begin(context->config);
 
   server.on("/status", HTTP_GET, &getStatus);
   server.on("/config", HTTP_POST, &updateConfig);
   server.on("/restart", HTTP_GET, &restart);
   server.registerUpdater();
-  server.begin(config);
+  server.begin(context->config);
 }
 
 void loop()

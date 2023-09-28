@@ -9,10 +9,9 @@
 class Monitor
 {
 private:
-    Config *config;
     Context *context;
 
 public:
-    void begin(Config *, Context *);
+    void begin(Context *);
     void write(AsyncResponseStream *);
 };

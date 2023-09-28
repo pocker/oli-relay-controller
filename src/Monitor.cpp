@@ -5,9 +5,8 @@
 
 #include "pinout.h"
 
-void Monitor::begin(Config *config, Context *context)
+void Monitor::begin(Context *context)
 {
-    this->config = config;
     this->context = context;
 }
 
@@ -28,11 +27,11 @@ void Monitor::write(AsyncResponseStream *response)
 
     JsonObject config = status.createNestedObject("config");
     JsonObject wifi = config.createNestedObject("wifi");
-    wifi["ssid"] = this->config->wifi.ssid;
+    wifi["ssid"] = this->context->config->wifi.ssid;
     JsonObject user = config.createNestedObject("user");
-    user["username"] = this->config->user.username;
+    user["username"] = this->context->config->user.username;
     JsonObject profile = config.createNestedObject("profile");
-    profile["active"] = this->config->profile.active;
+    profile["active"] = this->context->config->profile.active;
     JsonArray configuration = profile.createNestedArray("configuration");
 
     for (int i = 0; i < MAX_PROFILE; i++)
@@ -40,7 +39,7 @@ void Monitor::write(AsyncResponseStream *response)
         JsonArray actualConfig = configuration.createNestedArray();
         for (int j = 0; j < OUTPUTS; j++)
         {
-            actualConfig.add(this->config->profile.configuration[i][j]);
+            actualConfig.add(this->context->config->profile.configuration[i][j]);
         }
     }
 
