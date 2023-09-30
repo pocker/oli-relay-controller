@@ -9,55 +9,69 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node env
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: 19.x
           cache: "npm"
           cache-dependency-path: ./ui/package-lock.json
-      - name: Installing dependencies and run build
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+      - name: Build UI
         working-directory: ./ui
         run: |
           npm ci
           npm run build --if-present
+      - run: pio run --target buildgfs
       - name: Exporting artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ui-component
-          path: ./ui/dist
+          name: spiffs
+          path: .pio/build/**/spiffs.bin
   build-fw:
-    permissions: write-all
-    needs: build-ui
-    name: Build Firwmare
+    name: Build Firmware
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: pip install --upgrade platformio
+      - run: pio run
+      - name: Exporting artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: .pio/build/**/firmware_*.bin
+  create-release:
+    permissions: write-all
+    needs: [build-ui, build-fw]
+    name: Create release
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/download-artifact@v3
         with:
-          name: ui-component
-          path: ./ui/dist
-      - name: Cache pip
-        uses: actions/cache@v3
+          name: spiffs
+          path: ./
+      - uses: actions/download-artifact@v3
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      - name: Cache PlatformIO
-        uses: actions/cache@v3
-        with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
-      - name: Set up Python
-        uses: actions/setup-python@v3
-      - name: Install PlatformIO
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade platformio
-      - name: Run PlatformIO
-        run: |
-          pio run
-          pio run -t buildfs
+          name: firmware
+          path: ./
+    
       - name: Creating github release
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
@@ -65,6 +79,5 @@ jobs:
           automatic_release_tag: "release-${{ github.run_number }}"
           prerelease: false
           files: |
-            .pio/build/project.checksum
-            .pio/build/**/firmware_*.bin
-            .pio/build/**/spiffs.bin
+            ./firmware_*.bin
+            ./spiffs.bin
