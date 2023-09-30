@@ -66,11 +66,11 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: spiffs
-          path: ./
+          path: ./out
       - uses: actions/download-artifact@v3
         with:
           name: firmware
-          path: ./
+          path: ./out
     
       - name: Creating github release
         uses: "marvinpinto/action-automatic-releases@latest"
@@ -79,5 +79,5 @@ jobs:
           automatic_release_tag: "release-${{ github.run_number }}"
           prerelease: false
           files: |
-            ./firmware_*.bin
-            ./spiffs.bin
+            .out/**/firmware_*.bin
+            .out/**/spiffs.bin
