@@ -1,6 +1,7 @@
 name: Build UI
-on: [workflow_call] 
-
+on:
+  workflow_call:
+    
 jobs:
   build-ui:
     runs-on: ubuntu-latest

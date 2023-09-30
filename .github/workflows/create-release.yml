@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/workflows/build-ui
-      - uses: ./.github/workflows/build-fw
+      - uses: ./.github/workflows/build-ui.yml@v1
+      - uses: ./.github/workflows/build-fw.yml@v1
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
