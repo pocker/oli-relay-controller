@@ -1,0 +1,78 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: ["main"]
+jobs:
+  build-ui:
+    name: Build UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 19.x
+          cache: "npm"
+          cache-dependency-path: ./ui/package-lock.json
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+      - name: Build UI
+        working-directory: ./ui
+        run: |
+          npm ci
+          npm run build --if-present
+      - run: pio run --target buildfs
+      - name: Exporting artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: spiffs
+          path: .pio/build/**/spiffs.bin
+  build-fw:
+    name: Build Firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: pip install --upgrade platformio
+      - run: pio run
+      - name: Exporting artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: .pio/build/**/firmware_*.bin
+  create-release:
+    permissions: write-all
+    needs: [build-ui, build-fw]
+    name: Create release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          path: ./out
+      - name: Creating github release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "release-${{ github.run_number }}"
+          prerelease: false
+          files: |
+            ls -lah ./out
+            ./out/**/firmware_*.bin
+            ./out/**/spiffs.bin
