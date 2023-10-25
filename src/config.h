@@ -6,8 +6,8 @@
 
 struct Wifi
 {
-    char ssid[16];
-    char password[16];
+    char ssid[32];
+    char password[32];
 };
 
 struct User
