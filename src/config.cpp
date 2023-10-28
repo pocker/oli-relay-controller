@@ -12,16 +12,12 @@ bool loadConfig(Config *config)
     EEPROM.readBytes(0, config, sizeof(Config));
     unsigned int sum = checksum(config);
 
-    Serial.print("Calculated: ");
-    Serial.println(sum);
-    Serial.print("Cofnig checksum: ");
-    Serial.println(config->checksum);
-
     bool valid = sum == config->checksum;
 
     if (!valid)
     {
         memcpy(config, &DEFAULT_CONFIG, sizeof(Config));
+        writeConfig(config);
     }
 
     return valid;
