@@ -60,8 +60,8 @@ void updateConfig(AsyncWebServerRequest *request, uint8_t *data, size_t len, siz
     JsonObject wifi = bodyJSON["wifi"];
     if (wifi.containsKey("ssid") && wifi.containsKey("password"))
     {
-      strncpy(context->config->wifi.ssid, wifi["ssid"], 16);
-      strncpy(context->config->wifi.password, wifi["password"], 16);
+      strncpy(context->config->wifi.ssid, wifi["ssid"], 32);
+      strncpy(context->config->wifi.password, wifi["password"], 32);
     }
   }
 
