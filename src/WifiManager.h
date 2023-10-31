@@ -20,6 +20,7 @@ private:
     void connect();
     void hostAP();
     bool shouldHostAP();
+    bool hasCredentials();
 
 public:
     void begin(Config *);

@@ -7,7 +7,16 @@
 void WifiManager::begin(Config *config)
 {
     this->config = config;
-    this->connect();
+
+    if (this->hasCredentials())
+    {
+        this->connect();
+    }
+    else
+    {
+        this->hostAP();
+    }
+
     MDNS.begin(this->DEFAULT_SSID);
     MDNS.addService("http", "tcp", 80);
 }
@@ -31,13 +40,14 @@ void WifiManager::loop()
     }
     else if (millis() - this->lastTry > this->CONNECTION_TIMEOUT)
     {
-        this->connect();
+        WiFi.disconnect();
+        WiFi.reconnect();
     }
 }
 
 bool WifiManager::shouldHostAP()
 {
-    return strlen(config->wifi.ssid) == 0 || strlen(config->wifi.password) == 0 || (millis() > this->AP_MODE_TIMEOUT && !this->initialConnection);
+    return !this->hasCredentials() || (millis() > this->AP_MODE_TIMEOUT && !this->initialConnection);
 }
 
 void WifiManager::connect()
@@ -55,4 +65,9 @@ void WifiManager::hostAP()
     WiFi.mode(WIFI_AP);
     WiFi.softAP(this->DEFAULT_SSID, this->DEFAULT_PASSWORD);
     this->apMode = true;
+}
+
+bool WifiManager::hasCredentials()
+{
+    return strlen(config->wifi.ssid) > 0 && strlen(config->wifi.password) > 0;
 }
