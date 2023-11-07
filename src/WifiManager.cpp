@@ -23,14 +23,14 @@ void WifiManager::begin(Config *config)
 
 void WifiManager::loop()
 {
-    if (WiFi.status() == WL_CONNECTED)
+    if (this->apMode)
     {
-        this->initialConnection = true;
         return;
     }
 
-    if (this->apMode)
+    if (WiFi.status() == WL_CONNECTED)
     {
+        this->initialConnection = true;
         return;
     }
 
@@ -40,8 +40,8 @@ void WifiManager::loop()
     }
     else if (millis() - this->lastTry > this->CONNECTION_TIMEOUT)
     {
-        WiFi.disconnect();
         WiFi.reconnect();
+        this->lastTry = millis();
     }
 }
 
