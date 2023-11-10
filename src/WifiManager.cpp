@@ -7,7 +7,7 @@
 void WifiManager::begin(Config *config)
 {
     this->config = config;
-
+    WiFi.setSleep(false);
     if (this->hasCredentials())
     {
         this->connect();
