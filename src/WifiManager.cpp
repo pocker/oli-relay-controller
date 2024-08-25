@@ -40,8 +40,7 @@ void WifiManager::loop()
     }
     else if (millis() - this->lastTry > this->CONNECTION_TIMEOUT)
     {
-        WiFi.reconnect();
-        this->lastTry = millis();
+        this->connect();
     }
 }
 
@@ -53,7 +52,7 @@ bool WifiManager::shouldHostAP()
 void WifiManager::connect()
 {
     struct Wifi &wifi = config->wifi;
-    WiFi.disconnect();
+    WiFi.disconnect(true);
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifi.ssid, wifi.password);
     this->lastTry = millis();
@@ -61,7 +60,7 @@ void WifiManager::connect()
 
 void WifiManager::hostAP()
 {
-    WiFi.disconnect();
+    WiFi.disconnect(true);
     WiFi.mode(WIFI_AP);
     WiFi.softAP(this->DEFAULT_SSID, this->DEFAULT_PASSWORD);
     this->apMode = true;

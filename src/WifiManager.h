@@ -14,7 +14,7 @@ private:
     Config *config;
 
     bool initialConnection;
-    unsigned long lastTry = (unsigned long)-1;
+    unsigned long lastTry = 0;
     bool apMode = false;
 
     void connect();
