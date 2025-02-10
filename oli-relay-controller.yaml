@@ -1,0 +1,379 @@
+substitutions:
+  name: "oli-relay-controller"
+  friendly_name: "Fűtés relé vezérlő"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: false
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable web server and OTA updates
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: admin
+
+# Enable OTA updates
+ota:
+ - platform: esphome
+   password: "ea313f6fff79ec0bab75de625e2665a0"
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "0HRMbYKLzk/UGurzEWyIchFVllOLfO9WKdUvRzqSHDw="
+
+wifi:
+  # WiFi credentials
+  ssid: !secret wifi_ssid_iot
+  password: !secret wifi_password
+  power_save_mode: none
+  manual_ip:    
+    static_ip: 192.168.1.81    
+    gateway: 192.168.1.20    
+    subnet: 255.255.255.0
+    dns1: 192.168.1.20
+    dns2: 8.8.8.8
+  
+  # Enable fallback hotspot (captive portal) if WiFi connection fails
+  ap:
+    ssid: 'relay-controller-ap'
+    password: 'relay-controller-pass'
+    
+# WiFi signal strength sensor
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Strength"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+    unit_of_measurement: "h"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x / 3600;
+
+text_sensor:
+  - platform: wifi_info    
+    ip_address:
+      name: "IP"
+      icon: "mdi:ip-outline"
+      update_interval: 60s
+      entity_category: diagnostic
+    ssid:
+      name: "SSID"
+      icon: "mdi:wifi-settings"
+      update_interval: 60s
+      entity_category: diagnostic
+    bssid:
+      name: "BSSID"
+      icon: "mdi:wifi-settings"
+      update_interval: 60s
+      entity_category: diagnostic
+    mac_address:
+      name: "MAC"
+      icon: "mdi:network-outline"
+      entity_category: diagnostic
+    scan_results:
+      name: "Wifi Scan"
+      icon: "mdi:wifi-refresh"
+      entity_category: diagnostic
+
+# Define the binary inputs (with inverted logic since original uses active LOW)
+binary_sensor:
+  - platform: gpio
+    pin: GPIO21
+    name: "Input T1"
+    icon: "mdi:thermostat"
+    id: t1
+    filters:
+      - invert:      
+      - delayed_off: 500ms    
+
+  - platform: gpio
+    pin: GPIO19
+    name: "Input T2"
+    icon: "mdi:thermostat"
+    id: t2
+    filters:
+      - invert:      
+      - delayed_off: 500ms    
+
+  - platform: gpio
+    pin: GPIO18
+    name: "Input T3"
+    icon: "mdi:thermostat"
+    id: t3
+    filters:
+      - invert:      
+      - delayed_off: 500ms    
+
+# Define the relay outputs
+switch:
+  - platform: gpio
+    pin: 22
+    name: "Relay K1"
+    id: k1
+
+  - platform: gpio
+    pin: 17
+    name: "Relay K2"
+    id: k2
+
+  - platform: gpio
+    pin: 16
+    name: "Relay K3"
+    id: k3
+
+# Define a restart button
+button:
+  - platform: restart
+    name: "Restart"
+
+# Define global variables
+globals:
+  - id: active_profile
+    type: int
+    initial_value: '0'
+    restore_value: true
+  
+  # Previous states for debouncing
+  - id: prev_t1_state
+    type: bool
+    initial_value: 'false'
+    restore_value: true
+  - id: prev_t2_state
+    type: bool
+    initial_value: 'false'
+    restore_value: true
+  - id: prev_t3_state
+    type: bool
+    initial_value: 'false'
+    restore_value: true
+
+# Select component for profile switching
+select:
+  - platform: template
+    name: "Active Profile"
+    id: profile_selector
+    options:
+      - "Profile 0 (Hold)"
+      - "Profile 1 (Bypass)"
+      - "Profile 2 (Config)"
+    initial_option: "Profile 0 (Hold)"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            if (x == "Profile 0 (Hold)") {
+              id(active_profile) = 0;
+            } else if (x == "Profile 1 (Bypass)") {
+              id(active_profile) = 1;
+            } else {
+              id(active_profile) = 2;
+            }
+
+  # Profile 2 K1 configurations
+  - platform: template
+    name: "P2 T1 K1 Config"
+    id: p2_t1_k1
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "P2 T2 K1 Config"
+    id: p2_t2_k1
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "P2 T3 K1 Config"
+    id: p2_t3_k1
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  # Profile 2 K2 configurations
+  - platform: template
+    name: "P2 T1 K2 Config"
+    id: p2_t1_k2
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "P2 T2 K2 Config"
+    id: p2_t2_k2
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "P2 T3 K2 Config"
+    id: p2_t3_k2
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  # Profile 2 K3 configurations
+  - platform: template
+    name: "P2 T1 K3 Config"
+    id: p2_t1_k3
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "P2 T2 K3 Config"
+    id: p2_t2_k3
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "P2 T3 K3 Config"
+    id: p2_t3_k3
+    entity_category: CONFIG
+    options:
+      - "ignore"
+      - "active"
+      - "inactive"
+    initial_option: "ignore"
+    optimistic: true
+    restore_value: true
+
+# Automation to handle relay control based on inputs and active profile
+interval:
+  - interval: 500ms
+    then:
+      - lambda: |-
+          // ===== Input State Reading =====
+          // Read current state of all inputs
+          // Note: true = input active, false = input inactive
+          bool t1_state = id(t1).state;
+          bool t2_state = id(t2).state;
+          bool t3_state = id(t3).state;
+          
+          // Only process if states have changed
+          bool states_changed = (t1_state != id(prev_t1_state)) || 
+                              (t2_state != id(prev_t2_state)) || 
+                              (t3_state != id(prev_t3_state));
+          
+          // Update previous states
+          id(prev_t1_state) = t1_state;
+          id(prev_t2_state) = t2_state;
+          id(prev_t3_state) = t3_state;
+          
+          // Skip processing if no changes (for both Bypass and Config modes)
+          if ((id(active_profile) == 1 || id(active_profile) == 2) && !states_changed) {
+            return;
+          }
+          
+          // Helper function to check if an input matches the configuration
+          auto check_input = [](const std::string &config, bool input_state) -> bool {
+            if (config == "ignore") return true;
+            if (config == "active") return input_state;
+            if (config == "inactive") return !input_state;
+            return false;
+          };
+          
+          // Helper function to process a relay based on its configuration
+          auto process_relay = [&](esphome::template_::TemplateSelect *t1_cfg, esphome::template_::TemplateSelect *t2_cfg, esphome::template_::TemplateSelect *t3_cfg) -> bool {
+            std::string t1_val = t1_cfg->state;
+            std::string t2_val = t2_cfg->state;
+            std::string t3_val = t3_cfg->state;
+            bool t1_match = check_input(t1_val, t1_state);
+            bool t2_match = check_input(t2_val, t2_state);
+            bool t3_match = check_input(t3_val, t3_state);
+            
+            return t1_match && t2_match && t3_match;
+          };
+          
+          // Process relays based on active profile
+          switch (id(active_profile)) {
+            case 0:
+              // Profile 0 (Hold) - Do nothing, maintain current relay states
+              break;
+              
+            case 1:
+              // Profile 1 (Bypass) - Direct input to output mapping
+              if (t1_state) id(k1).turn_on(); else id(k1).turn_off();
+              if (t2_state) id(k2).turn_on(); else id(k2).turn_off();
+              if (t3_state) id(k3).turn_on(); else id(k3).turn_off();
+              break;
+              
+            case 2:
+              // Profile 2 (Config) - Configurable behavior
+              if (process_relay(id(p2_t1_k1), id(p2_t2_k1), id(p2_t3_k1))) {
+                id(k1).turn_on();
+              } else {
+                id(k1).turn_off();
+              }
+              
+              if (process_relay(id(p2_t1_k2), id(p2_t2_k2), id(p2_t3_k2))) {
+                id(k2).turn_on();
+              } else {
+                id(k2).turn_off();
+              }
+              
+              if (process_relay(id(p2_t1_k3), id(p2_t2_k3), id(p2_t3_k3))) {
+                id(k3).turn_on();
+              } else {
+                id(k3).turn_off();
+              }
+              break;
+          }
