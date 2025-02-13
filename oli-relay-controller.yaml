@@ -57,12 +57,9 @@ sensor:
     entity_category: diagnostic
 
   - platform: uptime
-    name: "Uptime"
-    update_interval: 60s
-    unit_of_measurement: "h"
-    accuracy_decimals: 2
-    filters:
-      - lambda: return x / 3600;
+    name: Uptime raw
+    id: uptime_raw
+    internal: true
 
 text_sensor:
   - platform: wifi_info    
@@ -89,6 +86,19 @@ text_sensor:
       name: "Wifi Scan"
       icon: "mdi:wifi-refresh"
       entity_category: diagnostic
+  - platform: template
+    name: Uptime
+    update_interval: 60s
+    entity_category: diagnostic
+    lambda: |-
+      int seconds = id(uptime_raw).state;
+      int days = seconds / 86400;
+      int hours = (seconds % 86400) / 3600;
+      int minutes = (seconds % 3600) / 60;
+      char hour_str[3];
+      sprintf(hour_str, "%02d", hours);
+      return to_string(days) + "d " + hour_str + "h " + to_string(minutes) + "m";
+        
 
 # Define the binary inputs (with inverted logic since original uses active LOW)
 binary_sensor:
@@ -119,6 +129,7 @@ binary_sensor:
       - invert:      
       - delayed_off: 500ms    
 
+
 # Define the relay outputs
 switch:
   - platform: gpio
@@ -135,6 +146,13 @@ switch:
     pin: 16
     name: "Relay K3"
     id: k3
+
+  - platform: template
+    name: "Input T4"
+    icon: "mdi:thermostat"
+    id: t4
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
 
 # Define a restart button
 button:
@@ -158,6 +176,10 @@ globals:
     initial_value: 'false'
     restore_value: true
   - id: prev_t3_state
+    type: bool
+    initial_value: 'false'
+    restore_value: true
+  - id: prev_t4_state
     type: bool
     initial_value: 'false'
     restore_value: true
@@ -185,116 +207,6 @@ select:
               id(active_profile) = 2;
             }
 
-  # Profile 2 K1 configurations
-  - platform: template
-    name: "P2 T1 K1 Config"
-    id: p2_t1_k1
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  - platform: template
-    name: "P2 T2 K1 Config"
-    id: p2_t2_k1
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  - platform: template
-    name: "P2 T3 K1 Config"
-    id: p2_t3_k1
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  # Profile 2 K2 configurations
-  - platform: template
-    name: "P2 T1 K2 Config"
-    id: p2_t1_k2
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  - platform: template
-    name: "P2 T2 K2 Config"
-    id: p2_t2_k2
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  - platform: template
-    name: "P2 T3 K2 Config"
-    id: p2_t3_k2
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  # Profile 2 K3 configurations
-  - platform: template
-    name: "P2 T1 K3 Config"
-    id: p2_t1_k3
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  - platform: template
-    name: "P2 T2 K3 Config"
-    id: p2_t2_k3
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
-
-  - platform: template
-    name: "P2 T3 K3 Config"
-    id: p2_t3_k3
-    entity_category: CONFIG
-    options:
-      - "ignore"
-      - "active"
-      - "inactive"
-    initial_option: "ignore"
-    optimistic: true
-    restore_value: true
 
 # Automation to handle relay control based on inputs and active profile
 interval:
@@ -307,16 +219,19 @@ interval:
           bool t1_state = id(t1).state;
           bool t2_state = id(t2).state;
           bool t3_state = id(t3).state;
+          bool t4_state = id(t4).state;
           
           // Only process if states have changed
           bool states_changed = (t1_state != id(prev_t1_state)) || 
                               (t2_state != id(prev_t2_state)) || 
-                              (t3_state != id(prev_t3_state));
+                              (t3_state != id(prev_t3_state)) || 
+                              (t4_state != id(prev_t4_state));
           
           // Update previous states
           id(prev_t1_state) = t1_state;
           id(prev_t2_state) = t2_state;
           id(prev_t3_state) = t3_state;
+          id(prev_t4_state) = t4_state;
           
           // Skip processing if no changes (for both Bypass and Config modes)
           if ((id(active_profile) == 1 || id(active_profile) == 2) && !states_changed) {
@@ -329,18 +244,6 @@ interval:
             if (config == "active") return input_state;
             if (config == "inactive") return !input_state;
             return false;
-          };
-          
-          // Helper function to process a relay based on its configuration
-          auto process_relay = [&](esphome::template_::TemplateSelect *t1_cfg, esphome::template_::TemplateSelect *t2_cfg, esphome::template_::TemplateSelect *t3_cfg) -> bool {
-            std::string t1_val = t1_cfg->state;
-            std::string t2_val = t2_cfg->state;
-            std::string t3_val = t3_cfg->state;
-            bool t1_match = check_input(t1_val, t1_state);
-            bool t2_match = check_input(t2_val, t2_state);
-            bool t3_match = check_input(t3_val, t3_state);
-            
-            return t1_match && t2_match && t3_match;
           };
           
           // Process relays based on active profile
@@ -357,20 +260,23 @@ interval:
               break;
               
             case 2:
-              // Profile 2 (Config) - Configurable behavior
-              if (process_relay(id(p2_t1_k1), id(p2_t2_k1), id(p2_t3_k1))) {
+              // Profile 2 (Config) - Hardcoded behavior
+              // K1: T1 active, T2 ignore, T3 ignore
+              if (t1_state && true && true) {
                 id(k1).turn_on();
               } else {
                 id(k1).turn_off();
               }
               
-              if (process_relay(id(p2_t1_k2), id(p2_t2_k2), id(p2_t3_k2))) {
+              // K2: T1 active, T2 ignore, T3 ignore
+              if (t1_state && true && true) {
                 id(k2).turn_on();
               } else {
                 id(k2).turn_off();
               }
               
-              if (process_relay(id(p2_t1_k3), id(p2_t2_k3), id(p2_t3_k3))) {
+              // K3: T1 active, T2 ignore, T3 active OR if T3/T4 is active
+              if (t1_state && true && (t3_state || t4_state)) {
                 id(k3).turn_on();
               } else {
                 id(k3).turn_off();
