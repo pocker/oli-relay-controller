@@ -6,6 +6,18 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: false
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          // Force initial relay state update based on active profile and inputs
+          bool t1_state = id(t1).state;
+          bool t2_state = id(t2).state;
+          bool t3_state = id(t3).state;
+          bool t4_state = id(t4).state;
+          
+          // Call the update_relays script to apply the correct states
+          id(update_relays).execute(t1_state, t2_state, t3_state, t4_state);
 
 esp32:
   board: esp32dev
@@ -102,6 +114,12 @@ text_sensor:
 
 # Define the binary inputs (with inverted logic since original uses active LOW)
 binary_sensor:
+  # Home Assistant connection status sensor
+  - platform: status
+    name: "Connection"
+    id: connection_status
+    entity_category: diagnostic
+  
   - platform: gpio
     pin: GPIO21
     name: "Input T1"
@@ -136,16 +154,19 @@ switch:
     pin: 22
     name: "Relay K1"
     id: k1
+    restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: gpio
     pin: 17
     name: "Relay K2"
     id: k2
+    restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: gpio
     pin: 16
     name: "Relay K3"
     id: k3
+    restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: template
     name: "Input T4"
@@ -207,7 +228,6 @@ select:
               id(active_profile) = 2;
             }
 
-
 # Automation to handle relay control based on inputs and active profile
 interval:
   - interval: 500ms
@@ -221,7 +241,7 @@ interval:
           bool t3_state = id(t3).state;
           bool t4_state = id(t4).state;
           
-          // Only process if states have changed
+          // Check if states have changed
           bool states_changed = (t1_state != id(prev_t1_state)) || 
                               (t2_state != id(prev_t2_state)) || 
                               (t3_state != id(prev_t3_state)) || 
@@ -233,19 +253,30 @@ interval:
           id(prev_t3_state) = t3_state;
           id(prev_t4_state) = t4_state;
           
-          // Skip processing if no changes (for both Bypass and Config modes)
+          // For Profile 0 (Hold), never update based on inputs
+          if (id(active_profile) == 0) {
+            return;
+          }
+          
+          // For Profiles 1 & 2, only update if states have changed
           if ((id(active_profile) == 1 || id(active_profile) == 2) && !states_changed) {
             return;
           }
           
-          // Helper function to check if an input matches the configuration
-          auto check_input = [](const std::string &config, bool input_state) -> bool {
-            if (config == "ignore") return true;
-            if (config == "active") return input_state;
-            if (config == "inactive") return !input_state;
-            return false;
-          };
-          
+          // Call the update_relays script with current states
+          id(update_relays).execute(t1_state, t2_state, t3_state, t4_state);
+
+# Define a helper script to update relays based on inputs and active profile
+script:
+  - id: update_relays
+    mode: restart
+    parameters:
+      t1_state: bool
+      t2_state: bool
+      t3_state: bool
+      t4_state: bool
+    then:
+      - lambda: |-
           // Process relays based on active profile
           switch (id(active_profile)) {
             case 0:
