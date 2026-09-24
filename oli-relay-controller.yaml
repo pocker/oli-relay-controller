@@ -7,17 +7,23 @@ esphome:
   friendly_name: ${friendly_name}
   name_add_mac_suffix: false
   on_boot:
-    priority: 600
-    then:
-      - lambda: |-
-          // Force initial relay state update based on active profile and inputs
-          bool t1_state = id(t1).state;
-          bool t2_state = id(t2).state;
-          bool t3_state = id(t3).state;
-          bool t4_state = id(t4).state;
-          
-          // Call the update_relays script to apply the correct states
-          id(update_relays).execute(t1_state, t2_state, t3_state, t4_state);
+    - priority: 800
+      then:
+        - lambda: |-
+            // Log boot reason for diagnosing unexpected reboots
+            ESP_LOGI("boot", "Boot reason: %d", esp_reset_reason());
+            ESP_LOGI("boot", "Free heap: %.1f kB", esp_get_free_heap_size() / 1024.0);
+    - priority: 600
+      then:
+        - lambda: |-
+            // Force initial relay state update based on active profile and inputs
+            bool t1_state = id(t1).state;
+            bool t2_state = id(t2).state;
+            bool t3_state = id(t3).state;
+            bool t4_state = id(t4).state;
+            
+            // Call the update_relays script to apply the correct states
+            id(update_relays).execute(t1_state, t2_state, t3_state, t4_state);
 
 esp32:
   board: esp32dev
@@ -27,39 +33,47 @@ esp32:
 # Enable web server and OTA updates
 web_server:
   port: 80
+  local: True
   auth:
     username: admin
-    password: admin
+    password: !secret esphome_web_password
 
 # Enable OTA updates
 ota:
  - platform: esphome
    password: "ea313f6fff79ec0bab75de625e2665a0"
 
-# Enable logging
+# Enable logging with DEBUG level for troubleshooting random reboots
 logger:
+  level: DEBUG
+  logs:
+    component: DEBUG
 
 # Enable Home Assistant API
 api:
   encryption:
-    key: "0HRMbYKLzk/UGurzEWyIchFVllOLfO9WKdUvRzqSHDw="
+    key: !secret futes_rele_api_key
 
 wifi:
   # WiFi credentials
-  ssid: !secret wifi_ssid_iot
+  ssid: !secret wifi_ssid
   password: !secret wifi_password
   power_save_mode: none
+  output_power: 15dB  # Reduced from default 20dB to lower power consumption and prevent brownout
+  min_auth_mode: WPA2  # Explicit security mode setting (recommended by ESPHome 2025.11+)
   manual_ip:    
     static_ip: 192.168.1.81    
-    gateway: 192.168.1.20    
+    gateway: 192.168.1.1    
     subnet: 255.255.255.0
-    dns1: 192.168.1.20
+    dns1: 192.168.1.1
     dns2: 8.8.8.8
   
   # Enable fallback hotspot (captive portal) if WiFi connection fails
   ap:
     ssid: 'relay-controller-ap'
-    password: 'relay-controller-pass'
+    password: !secret relay_ap_password
+
+captive_portal:  # This component automatically enables OTA
     
 # WiFi signal strength sensor
 sensor:
@@ -73,22 +87,29 @@ sensor:
     id: uptime_raw
     internal: true
 
+  # Diagnostic: Free heap memory monitoring (helps detect memory leaks)
+  - platform: template
+    name: "Free Heap"
+    lambda: return esp_get_free_heap_size() / 1024.0;
+    unit_of_measurement: "kB"
+    update_interval: 30s
+    entity_category: diagnostic
+    accuracy_decimals: 1
+    icon: "mdi:memory"
+
 text_sensor:
   - platform: wifi_info    
     ip_address:
       name: "IP"
       icon: "mdi:ip-outline"
-      update_interval: 60s
       entity_category: diagnostic
     ssid:
       name: "SSID"
       icon: "mdi:wifi-settings"
-      update_interval: 60s
       entity_category: diagnostic
     bssid:
       name: "BSSID"
       icon: "mdi:wifi-settings"
-      update_interval: 60s
       entity_category: diagnostic
     mac_address:
       name: "MAC"
@@ -204,6 +225,12 @@ globals:
     type: bool
     initial_value: 'false'
     restore_value: true
+  
+  # Relay delay configuration in seconds
+  - id: relay_delay_seconds
+    type: int
+    initial_value: '0'
+    restore_value: true
 
 # Select component for profile switching
 select:
@@ -211,26 +238,67 @@ select:
     name: "Active Profile"
     id: profile_selector
     options:
-      - "Profile 0 (Hold)"
-      - "Profile 1 (Bypass)"
-      - "Profile 2 (Config)"
-    initial_option: "Profile 0 (Hold)"
+      - "Profile 0 (Hold/Manual)"
+      - "Profile 1 (T1=K1, T2=K2, T3=K3)"
+      - "Profile 2 (T1=K1&K2, T1&(T3|T4)=K3)"
+      - "Profile 3 (T1=K1, T2|T3=K2&K3)"
+      - "Profile 4 (T1&(T2|T3)=All)"
+      - "Profile 5 (T2|T3=K1, T2=K2, T3=K3)"
+    initial_option: "Profile 4 (T1&(T2|T3)=All)"  # Default profile changed to Profile 4
     optimistic: true
     restore_value: true
     on_value:
       then:
         - lambda: |-
-            if (x == "Profile 0 (Hold)") {
+            if (x == "Profile 0 (Hold/Manual)") {
               id(active_profile) = 0;
-            } else if (x == "Profile 1 (Bypass)") {
+            } else if (x == "Profile 1 (T1=K1, T2=K2, T3=K3)") {
               id(active_profile) = 1;
-            } else {
+            } else if (x == "Profile 2 (T1=K1&K2, T1&(T3|T4)=K3)") {
               id(active_profile) = 2;
+            } else if (x == "Profile 3 (T1=K1, T2|T3=K2&K3)") {
+              id(active_profile) = 3;
+            } else if (x == "Profile 4 (T1&(T2|T3)=All)") {
+              id(active_profile) = 4;
+            } else if (x == "Profile 5 (T2|T3=K1, T2=K2, T3=K3)") {
+              id(active_profile) = 5;
             }
+  
+  - platform: template
+    name: "Relay Delay"
+    id: relay_delay
+    icon: "mdi:timer-outline"
+    options:
+      - "0 sec"
+      - "5 sec"
+      - "10 sec"
+      - "15 sec"
+      - "30 sec"
+      - "45 sec"
+      - "60 sec"
+      - "120 sec"
+      - "180 sec"
+      - "300 sec"
+    initial_option: "0 sec"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            if (x == "0 sec") id(relay_delay_seconds) = 0;
+            else if (x == "5 sec") id(relay_delay_seconds) = 5;
+            else if (x == "10 sec") id(relay_delay_seconds) = 10;
+            else if (x == "15 sec") id(relay_delay_seconds) = 15;
+            else if (x == "30 sec") id(relay_delay_seconds) = 30;
+            else if (x == "45 sec") id(relay_delay_seconds) = 45;
+            else if (x == "60 sec") id(relay_delay_seconds) = 60;
+            else if (x == "120 sec") id(relay_delay_seconds) = 120;
+            else if (x == "180 sec") id(relay_delay_seconds) = 180;
+            else if (x == "300 sec") id(relay_delay_seconds) = 300;
 
 # Automation to handle relay control based on inputs and active profile
 interval:
-  - interval: 500ms
+  - interval: 1000ms  # Reduced from 500ms to lower CPU load and prevent watchdog timeouts
     then:
       - lambda: |-
           // ===== Input State Reading =====
@@ -258,8 +326,8 @@ interval:
             return;
           }
           
-          // For Profiles 1 & 2, only update if states have changed
-          if ((id(active_profile) == 1 || id(active_profile) == 2) && !states_changed) {
+          // For Profiles 1, 2, 3, 4 & 5, only update if states have changed
+          if ((id(active_profile) == 1 || id(active_profile) == 2 || id(active_profile) == 3 || id(active_profile) == 4 || id(active_profile) == 5) && !states_changed) {
             return;
           }
           
@@ -269,14 +337,35 @@ interval:
 # Define a helper script to update relays based on inputs and active profile
 script:
   - id: update_relays
-    mode: restart
+    mode: single
     parameters:
       t1_state: bool
       t2_state: bool
       t3_state: bool
       t4_state: bool
     then:
+      # Apply configured delay before updating relays
+      - delay: !lambda "return id(relay_delay_seconds) * 1000;"
+      
       - lambda: |-
+          // Verify input states are still the same after delay (stable state filtering)
+          // If states changed during delay, do not update relays
+          bool current_t1 = id(t1).state;
+          bool current_t2 = id(t2).state;
+          bool current_t3 = id(t3).state;
+          bool current_t4 = id(t4).state;
+          
+          // Compare current states with the states WHEN SCRIPT STARTED
+          if (current_t1 != t1_state || current_t2 != t2_state || 
+              current_t3 != t3_state || current_t4 != t4_state) {
+            // States changed during delay - abort relay update
+            ESP_LOGD("update_relays", "Input states changed during delay - skipping relay update");
+            return;
+          }
+          
+          // States are stable - proceed with relay update
+          ESP_LOGD("update_relays", "Input states stable after delay - updating relays");
+          
           // Process relays based on active profile
           switch (id(active_profile)) {
             case 0:
@@ -308,6 +397,63 @@ script:
               
               // K3: T1 active, T2 ignore, T3 active OR if T3/T4 is active
               if (t1_state && true && (t3_state || t4_state)) {
+                id(k3).turn_on();
+              } else {
+                id(k3).turn_off();
+              }
+              break;
+              
+            case 3:
+              // Profile 3 (T1=K1, T2|T3=K2&K3) - T1 controls K1 directly, T2 OR T3 controls K2 and K3
+              // K1: Direct control by T1
+              if (t1_state) {
+                id(k1).turn_on();
+              } else {
+                id(k1).turn_off();
+              }
+              
+              // K2 and K3: Turn on if T2 OR T3 is active
+              if (t2_state || t3_state) {
+                id(k2).turn_on();
+                id(k3).turn_on();
+              } else {
+                id(k2).turn_off();
+                id(k3).turn_off();
+              }
+              break;
+              
+            case 4:
+              // Profile 4 (T1&(T2|T3)=All) - All outputs controlled by T1 AND (T2 OR T3)
+              // All relays (K1, K2, K3): Turn on only if T1 is active AND (T2 OR T3 is active)
+              if (t1_state && (t2_state || t3_state)) {
+                id(k1).turn_on();
+                id(k2).turn_on();
+                id(k3).turn_on();
+              } else {
+                id(k1).turn_off();
+                id(k2).turn_off();
+                id(k3).turn_off();
+              }
+              break;
+              
+            case 5:
+              // Profile 5 (T2|T3=K1, T2=K2, T3=K3) - T2 or T3 controls K1, T2 controls K2, T3 controls K3
+              // K1: Turn on if T2 OR T3 is active
+              if (t2_state || t3_state) {
+                id(k1).turn_on();
+              } else {
+                id(k1).turn_off();
+              }
+              
+              // K2: Direct control by T2
+              if (t2_state) {
+                id(k2).turn_on();
+              } else {
+                id(k2).turn_off();
+              }
+              
+              // K3: Direct control by T3
+              if (t3_state) {
                 id(k3).turn_on();
               } else {
                 id(k3).turn_off();
