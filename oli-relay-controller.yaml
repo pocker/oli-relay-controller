@@ -20,10 +20,9 @@ esphome:
             bool t1_state = id(t1).state;
             bool t2_state = id(t2).state;
             bool t3_state = id(t3).state;
-            bool t4_state = id(t4).state;
             
             // Call the update_relays script to apply the correct states
-            id(update_relays).execute(t1_state, t2_state, t3_state, t4_state);
+            id(update_relays).execute(t1_state, t2_state, t3_state);
 
 esp32:
   board: esp32dev
@@ -189,13 +188,6 @@ switch:
     id: k3
     restore_mode: RESTORE_DEFAULT_OFF
 
-  - platform: template
-    name: "Input T4"
-    icon: "mdi:thermostat"
-    id: t4
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-
 # Define a restart button
 button:
   - platform: restart
@@ -221,10 +213,6 @@ globals:
     type: bool
     initial_value: 'false'
     restore_value: true
-  - id: prev_t4_state
-    type: bool
-    initial_value: 'false'
-    restore_value: true
   
   # Relay delay configuration in seconds
   - id: relay_delay_seconds
@@ -240,7 +228,7 @@ select:
     options:
       - "Profile 0 (Hold/Manual)"
       - "Profile 1 (T1=K1, T2=K2, T3=K3)"
-      - "Profile 2 (T1=K1&K2, T1&(T3|T4)=K3)"
+      - "Profile 2 (T1=K1&K2, T1&T3=K3)"
       - "Profile 3 (T1=K1, T2|T3=K2&K3)"
       - "Profile 4 (T1&(T2|T3)=All)"
       - "Profile 5 (T2|T3=K1, T2=K2, T3=K3)"
@@ -254,7 +242,7 @@ select:
               id(active_profile) = 0;
             } else if (x == "Profile 1 (T1=K1, T2=K2, T3=K3)") {
               id(active_profile) = 1;
-            } else if (x == "Profile 2 (T1=K1&K2, T1&(T3|T4)=K3)") {
+            } else if (x == "Profile 2 (T1=K1&K2, T1&T3=K3)") {
               id(active_profile) = 2;
             } else if (x == "Profile 3 (T1=K1, T2|T3=K2&K3)") {
               id(active_profile) = 3;
@@ -307,19 +295,16 @@ interval:
           bool t1_state = id(t1).state;
           bool t2_state = id(t2).state;
           bool t3_state = id(t3).state;
-          bool t4_state = id(t4).state;
           
           // Check if states have changed
           bool states_changed = (t1_state != id(prev_t1_state)) || 
                               (t2_state != id(prev_t2_state)) || 
-                              (t3_state != id(prev_t3_state)) || 
-                              (t4_state != id(prev_t4_state));
+                              (t3_state != id(prev_t3_state));
           
           // Update previous states
           id(prev_t1_state) = t1_state;
           id(prev_t2_state) = t2_state;
           id(prev_t3_state) = t3_state;
-          id(prev_t4_state) = t4_state;
           
           // For Profile 0 (Hold), never update based on inputs
           if (id(active_profile) == 0) {
@@ -332,7 +317,7 @@ interval:
           }
           
           // Call the update_relays script with current states
-          id(update_relays).execute(t1_state, t2_state, t3_state, t4_state);
+          id(update_relays).execute(t1_state, t2_state, t3_state);
 
 # Define a helper script to update relays based on inputs and active profile
 script:
@@ -342,7 +327,6 @@ script:
       t1_state: bool
       t2_state: bool
       t3_state: bool
-      t4_state: bool
     then:
       # Apply configured delay before updating relays
       - delay: !lambda "return id(relay_delay_seconds) * 1000;"
@@ -353,11 +337,10 @@ script:
           bool current_t1 = id(t1).state;
           bool current_t2 = id(t2).state;
           bool current_t3 = id(t3).state;
-          bool current_t4 = id(t4).state;
           
           // Compare current states with the states WHEN SCRIPT STARTED
           if (current_t1 != t1_state || current_t2 != t2_state || 
-              current_t3 != t3_state || current_t4 != t4_state) {
+              current_t3 != t3_state) {
             // States changed during delay - abort relay update
             ESP_LOGD("update_relays", "Input states changed during delay - skipping relay update");
             return;
@@ -395,8 +378,8 @@ script:
                 id(k2).turn_off();
               }
               
-              // K3: T1 active, T2 ignore, T3 active OR if T3/T4 is active
-              if (t1_state && true && (t3_state || t4_state)) {
+              // K3: T1 active, T2 ignore, T3 active
+              if (t1_state && true && t3_state) {
                 id(k3).turn_on();
               } else {
                 id(k3).turn_off();
