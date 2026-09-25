@@ -13,16 +13,10 @@ esphome:
             // Log boot reason for diagnosing unexpected reboots
             ESP_LOGI("boot", "Boot reason: %d", esp_reset_reason());
             ESP_LOGI("boot", "Free heap: %.1f kB", esp_get_free_heap_size() / 1024.0);
-    - priority: 600
+    - priority: -100
       then:
-        - lambda: |-
-            // Force initial relay state update based on active profile and inputs
-            bool t1_state = id(t1).state;
-            bool t2_state = id(t2).state;
-            bool t3_state = id(t3).state;
-            
-            // Call the update_relays script to apply the correct states
-            id(update_relays).execute(t1_state, t2_state, t3_state);
+        # Apply the active profile to the inputs' initial states
+        - script.execute: update_relays
 
 esp32:
   board: esp32dev
@@ -42,11 +36,8 @@ ota:
  - platform: esphome
    password: "ea313f6fff79ec0bab75de625e2665a0"
 
-# Enable logging with DEBUG level for troubleshooting random reboots
 logger:
-  level: DEBUG
-  logs:
-    component: DEBUG
+  level: INFO
 
 # Enable Home Assistant API
 api:
@@ -81,11 +72,6 @@ sensor:
     update_interval: 60s
     entity_category: diagnostic
 
-  - platform: uptime
-    name: Uptime raw
-    id: uptime_raw
-    internal: true
-
   # Diagnostic: Free heap memory monitoring (helps detect memory leaks)
   - platform: template
     name: "Free Heap"
@@ -118,19 +104,10 @@ text_sensor:
       name: "Wifi Scan"
       icon: "mdi:wifi-refresh"
       entity_category: diagnostic
-  - platform: template
+  - platform: uptime
     name: Uptime
-    update_interval: 60s
     entity_category: diagnostic
-    lambda: |-
-      int seconds = id(uptime_raw).state;
-      int days = seconds / 86400;
-      int hours = (seconds % 86400) / 3600;
-      int minutes = (seconds % 3600) / 60;
-      char hour_str[3];
-      sprintf(hour_str, "%02d", hours);
-      return to_string(days) + "d " + hour_str + "h " + to_string(minutes) + "m";
-        
+
 
 # Define the binary inputs (with inverted logic since original uses active LOW)
 binary_sensor:
@@ -146,8 +123,10 @@ binary_sensor:
     icon: "mdi:thermostat"
     id: t1
     filters:
-      - invert:      
-      - delayed_off: 500ms    
+      - invert:
+      - delayed_off: 500ms
+    on_state:
+      - script.execute: update_relays
 
   - platform: gpio
     pin: GPIO19
@@ -155,8 +134,10 @@ binary_sensor:
     icon: "mdi:thermostat"
     id: t2
     filters:
-      - invert:      
-      - delayed_off: 500ms    
+      - invert:
+      - delayed_off: 500ms
+    on_state:
+      - script.execute: update_relays
 
   - platform: gpio
     pin: GPIO18
@@ -164,8 +145,10 @@ binary_sensor:
     icon: "mdi:thermostat"
     id: t3
     filters:
-      - invert:      
-      - delayed_off: 500ms    
+      - invert:
+      - delayed_off: 500ms
+    on_state:
+      - script.execute: update_relays
 
 
 # Define the relay outputs
@@ -193,33 +176,6 @@ button:
   - platform: restart
     name: "Restart"
 
-# Define global variables
-globals:
-  - id: active_profile
-    type: int
-    initial_value: '0'
-    restore_value: true
-  
-  # Previous states for debouncing
-  - id: prev_t1_state
-    type: bool
-    initial_value: 'false'
-    restore_value: true
-  - id: prev_t2_state
-    type: bool
-    initial_value: 'false'
-    restore_value: true
-  - id: prev_t3_state
-    type: bool
-    initial_value: 'false'
-    restore_value: true
-  
-  # Relay delay configuration in seconds
-  - id: relay_delay_seconds
-    type: int
-    initial_value: '0'
-    restore_value: true
-
 # Select component for profile switching
 select:
   - platform: template
@@ -236,21 +192,7 @@ select:
     optimistic: true
     restore_value: true
     on_value:
-      then:
-        - lambda: |-
-            if (x == "Profile 0 (Hold/Manual)") {
-              id(active_profile) = 0;
-            } else if (x == "Profile 1 (T1=K1, T2=K2, T3=K3)") {
-              id(active_profile) = 1;
-            } else if (x == "Profile 2 (T1=K1&K2, T1&T3=K3)") {
-              id(active_profile) = 2;
-            } else if (x == "Profile 3 (T1=K1, T2|T3=K2&K3)") {
-              id(active_profile) = 3;
-            } else if (x == "Profile 4 (T1&(T2|T3)=All)") {
-              id(active_profile) = 4;
-            } else if (x == "Profile 5 (T2|T3=K1, T2=K2, T3=K3)") {
-              id(active_profile) = 5;
-            }
+      - script.execute: update_relays
   
   - platform: template
     name: "Relay Delay"
@@ -270,176 +212,38 @@ select:
     initial_option: "0 sec"
     optimistic: true
     restore_value: true
-    on_value:
-      then:
-        - lambda: |-
-            if (x == "0 sec") id(relay_delay_seconds) = 0;
-            else if (x == "5 sec") id(relay_delay_seconds) = 5;
-            else if (x == "10 sec") id(relay_delay_seconds) = 10;
-            else if (x == "15 sec") id(relay_delay_seconds) = 15;
-            else if (x == "30 sec") id(relay_delay_seconds) = 30;
-            else if (x == "45 sec") id(relay_delay_seconds) = 45;
-            else if (x == "60 sec") id(relay_delay_seconds) = 60;
-            else if (x == "120 sec") id(relay_delay_seconds) = 120;
-            else if (x == "180 sec") id(relay_delay_seconds) = 180;
-            else if (x == "300 sec") id(relay_delay_seconds) = 300;
 
-# Automation to handle relay control based on inputs and active profile
-interval:
-  - interval: 1000ms  # Reduced from 500ms to lower CPU load and prevent watchdog timeouts
-    then:
-      - lambda: |-
-          // ===== Input State Reading =====
-          // Read current state of all inputs
-          // Note: true = input active, false = input inactive
-          bool t1_state = id(t1).state;
-          bool t2_state = id(t2).state;
-          bool t3_state = id(t3).state;
-          
-          // Check if states have changed
-          bool states_changed = (t1_state != id(prev_t1_state)) || 
-                              (t2_state != id(prev_t2_state)) || 
-                              (t3_state != id(prev_t3_state));
-          
-          // Update previous states
-          id(prev_t1_state) = t1_state;
-          id(prev_t2_state) = t2_state;
-          id(prev_t3_state) = t3_state;
-          
-          // For Profile 0 (Hold), never update based on inputs
-          if (id(active_profile) == 0) {
-            return;
-          }
-          
-          // For Profiles 1, 2, 3, 4 & 5, only update if states have changed
-          if ((id(active_profile) == 1 || id(active_profile) == 2 || id(active_profile) == 3 || id(active_profile) == 4 || id(active_profile) == 5) && !states_changed) {
-            return;
-          }
-          
-          // Call the update_relays script with current states
-          id(update_relays).execute(t1_state, t2_state, t3_state);
-
-# Define a helper script to update relays based on inputs and active profile
+# Relays follow the active profile. Every input or profile change restarts
+# the script, so relays only switch once the inputs have been stable for the
+# configured delay.
 script:
   - id: update_relays
-    mode: single
-    parameters:
-      t1_state: bool
-      t2_state: bool
-      t3_state: bool
+    mode: restart
     then:
-      # Apply configured delay before updating relays
-      - delay: !lambda "return id(relay_delay_seconds) * 1000;"
-      
+      - delay: !lambda "return atoi(id(relay_delay).current_option().c_str()) * 1000;"
       - lambda: |-
-          // Verify input states are still the same after delay (stable state filtering)
-          // If states changed during delay, do not update relays
-          bool current_t1 = id(t1).state;
-          bool current_t2 = id(t2).state;
-          bool current_t3 = id(t3).state;
-          
-          // Compare current states with the states WHEN SCRIPT STARTED
-          if (current_t1 != t1_state || current_t2 != t2_state || 
-              current_t3 != t3_state) {
-            // States changed during delay - abort relay update
-            ESP_LOGD("update_relays", "Input states changed during delay - skipping relay update");
-            return;
+          auto profile = id(profile_selector).active_index();
+          // Profile 0 (Hold/Manual): relays are left as they are
+          if (!profile.has_value() || *profile == 0) return;
+
+          bool in1 = id(t1).state;
+          bool in2 = id(t2).state;
+          bool in3 = id(t3).state;
+          bool out1, out2, out3;
+          switch (*profile) {
+            case 1: out1 = in1;         out2 = in2;         out3 = in3;         break;
+            case 2: out1 = in1;         out2 = in1;         out3 = in1 && in3;  break;
+            case 3: out1 = in1;         out2 = in2 || in3;  out3 = in2 || in3;  break;
+            case 4: out1 = out2 = out3 = in1 && (in2 || in3);                   break;
+            case 5: out1 = in2 || in3;  out2 = in2;         out3 = in3;         break;
+            default: return;
           }
-          
-          // States are stable - proceed with relay update
-          ESP_LOGD("update_relays", "Input states stable after delay - updating relays");
-          
-          // Process relays based on active profile
-          switch (id(active_profile)) {
-            case 0:
-              // Profile 0 (Hold) - Do nothing, maintain current relay states
-              break;
-              
-            case 1:
-              // Profile 1 (Bypass) - Direct input to output mapping
-              if (t1_state) id(k1).turn_on(); else id(k1).turn_off();
-              if (t2_state) id(k2).turn_on(); else id(k2).turn_off();
-              if (t3_state) id(k3).turn_on(); else id(k3).turn_off();
-              break;
-              
-            case 2:
-              // Profile 2 (Config) - Hardcoded behavior
-              // K1: T1 active, T2 ignore, T3 ignore
-              if (t1_state && true && true) {
-                id(k1).turn_on();
-              } else {
-                id(k1).turn_off();
-              }
-              
-              // K2: T1 active, T2 ignore, T3 ignore
-              if (t1_state && true && true) {
-                id(k2).turn_on();
-              } else {
-                id(k2).turn_off();
-              }
-              
-              // K3: T1 active, T2 ignore, T3 active
-              if (t1_state && true && t3_state) {
-                id(k3).turn_on();
-              } else {
-                id(k3).turn_off();
-              }
-              break;
-              
-            case 3:
-              // Profile 3 (T1=K1, T2|T3=K2&K3) - T1 controls K1 directly, T2 OR T3 controls K2 and K3
-              // K1: Direct control by T1
-              if (t1_state) {
-                id(k1).turn_on();
-              } else {
-                id(k1).turn_off();
-              }
-              
-              // K2 and K3: Turn on if T2 OR T3 is active
-              if (t2_state || t3_state) {
-                id(k2).turn_on();
-                id(k3).turn_on();
-              } else {
-                id(k2).turn_off();
-                id(k3).turn_off();
-              }
-              break;
-              
-            case 4:
-              // Profile 4 (T1&(T2|T3)=All) - All outputs controlled by T1 AND (T2 OR T3)
-              // All relays (K1, K2, K3): Turn on only if T1 is active AND (T2 OR T3 is active)
-              if (t1_state && (t2_state || t3_state)) {
-                id(k1).turn_on();
-                id(k2).turn_on();
-                id(k3).turn_on();
-              } else {
-                id(k1).turn_off();
-                id(k2).turn_off();
-                id(k3).turn_off();
-              }
-              break;
-              
-            case 5:
-              // Profile 5 (T2|T3=K1, T2=K2, T3=K3) - T2 or T3 controls K1, T2 controls K2, T3 controls K3
-              // K1: Turn on if T2 OR T3 is active
-              if (t2_state || t3_state) {
-                id(k1).turn_on();
-              } else {
-                id(k1).turn_off();
-              }
-              
-              // K2: Direct control by T2
-              if (t2_state) {
-                id(k2).turn_on();
-              } else {
-                id(k2).turn_off();
-              }
-              
-              // K3: Direct control by T3
-              if (t3_state) {
-                id(k3).turn_on();
-              } else {
-                id(k3).turn_off();
-              }
-              break;
-          }
+
+          auto set = [](switch_::Switch *relay, bool on) {
+            if (relay->state != on) {
+              if (on) relay->turn_on(); else relay->turn_off();
+            }
+          };
+          set(id(k1), out1);
+          set(id(k2), out2);
+          set(id(k3), out3);
