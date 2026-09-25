@@ -46,3 +46,29 @@ Anonymous user has read access but can't change the config.
 
 ## Known bugs
 - [ ] the LEDs of the K2 and K3 output is swapped.
+
+# ESPHome firmware
+
+The board now runs ESPHome (`oli-relay-controller.yaml`) instead of the
+PlatformIO firmware above. Secrets (`wifi_ssid`, `wifi_password`,
+`futes_rele_api_key`, `esphome_web_password`, `relay_ap_password`) come from
+the ESPHome `secrets.yaml`.
+
+## Relay logic
+
+Relays follow the **Active Profile** select. Any input or profile change
+restarts the update, so relays switch only once the inputs have been stable
+for the **Relay Delay** (0–300 s).
+
+| Profile | K1 | K2 | K3 |
+|---|---|---|---|
+| 0 (Hold/Manual) | unchanged | unchanged | unchanged |
+| 1 | T1 | T2 | T3 |
+| 2 | T1 | T1 | T1 & T3 |
+| 3 | T1 | T2 \| T3 | T2 \| T3 |
+| 4 | T1 & (T2 \| T3) | T1 & (T2 \| T3) | T1 & (T2 \| T3) |
+| 5 | T2 \| T3 | T2 | T3 |
+
+In profile 0 the relays can be switched manually from Home Assistant. In the
+other profiles a manual switch holds only until the next input or profile
+change.
