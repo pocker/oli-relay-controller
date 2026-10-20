@@ -68,6 +68,13 @@ for the **Relay Delay** (0–300 s).
 | 3 | T1 | T2 \| T3 | T2 \| T3 |
 | 4 | T1 & (T2 \| T3) | T1 & (T2 \| T3) | T1 & (T2 \| T3) |
 | 5 | T2 \| T3 | T2 | T3 |
+| 6 | T2 \| T3 \| hold | T2 \| T3 \| hold | T2 \| T3 \| hold |
+
+**Profile 6 hold:** when T2|T3 drops while T1 is on, the pumps keep running
+until T1 releases or **Hold Max Time** (1–120 min, default 30) is up. A new
+T2|T3 demand ends it. The hold only starts on that falling edge, so T1 pulling
+in again later does not restart the pumps. **Circulation Hold** shows whether
+it is active.
 
 In profile 0 the relays can be switched manually from Home Assistant. In the
 other profiles a manual switch holds only until the next input or profile

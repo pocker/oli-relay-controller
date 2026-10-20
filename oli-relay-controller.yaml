@@ -16,7 +16,7 @@ esphome:
     - priority: -100
       then:
         # Apply the active profile to the inputs' initial states
-        - script.execute: update_relays
+        - script.execute: inputs_changed
 
 esp32:
   board: esp32dev
@@ -64,7 +64,18 @@ wifi:
     password: !secret relay_ap_password
 
 captive_portal:  # This component automatically enables OTA
-    
+
+# Profile 6 circulation hold state
+globals:
+  # T2|T3 at the previous input change, for falling edge detection
+  - id: last_demand
+    type: bool
+    initial_value: "false"
+  # Pumps are kept running after T2|T3 dropped
+  - id: hold
+    type: bool
+    initial_value: "false"
+
 # WiFi signal strength sensor
 sensor:
   - platform: wifi_signal
@@ -116,7 +127,14 @@ binary_sensor:
     name: "Connection"
     id: connection_status
     entity_category: diagnostic
-  
+
+  - platform: template
+    name: "Circulation Hold"
+    id: hold_sensor
+    icon: "mdi:pump"
+    entity_category: diagnostic
+    lambda: return id(hold);
+
   - platform: gpio
     pin: GPIO21
     name: "Input T1"
@@ -126,7 +144,7 @@ binary_sensor:
       - invert:
       - delayed_off: 500ms
     on_state:
-      - script.execute: update_relays
+      - script.execute: inputs_changed
 
   - platform: gpio
     pin: GPIO19
@@ -137,7 +155,7 @@ binary_sensor:
       - invert:
       - delayed_off: 500ms
     on_state:
-      - script.execute: update_relays
+      - script.execute: inputs_changed
 
   - platform: gpio
     pin: GPIO18
@@ -148,7 +166,7 @@ binary_sensor:
       - invert:
       - delayed_off: 500ms
     on_state:
-      - script.execute: update_relays
+      - script.execute: inputs_changed
 
 
 # Define the relay outputs
@@ -188,11 +206,12 @@ select:
       - "Profile 3 (T1=K1, T2|T3=K2&K3)"
       - "Profile 4 (T1&(T2|T3)=All)"
       - "Profile 5 (T2|T3=K1, T2=K2, T3=K3)"
+      - "Profile 6 (T2|T3 + T1 hold=All)"
     initial_option: "Profile 4 (T1&(T2|T3)=All)"  # Default profile changed to Profile 4
     optimistic: true
     restore_value: true
     on_value:
-      - script.execute: update_relays
+      - script.execute: inputs_changed
   
   - platform: template
     name: "Relay Delay"
@@ -213,10 +232,52 @@ select:
     optimistic: true
     restore_value: true
 
-# Relays follow the active profile. Every input or profile change restarts
-# the script, so relays only switch once the inputs have been stable for the
-# configured delay.
+number:
+  # Profile 6: upper limit of the circulation hold
+  - platform: template
+    name: "Hold Max Time"
+    id: hold_max
+    icon: "mdi:timer-sand"
+    unit_of_measurement: "min"
+    min_value: 1
+    max_value: 120
+    step: 1
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
 script:
+  # Profile 6 hold: starts on the falling edge of T2|T3 if T1 is on at that
+  # moment, and ends when T1 releases, T2|T3 asks again, the max time is up
+  # or the profile changes. It only starts on an edge, so T1 pulling in again
+  # later (stagnant water warming up) does not restart the pumps.
+  - id: inputs_changed
+    then:
+      - lambda: |-
+          bool demand = id(t2).state || id(t3).state;
+          auto profile = id(profile_selector).active_index();
+          bool p6 = profile.has_value() && *profile == 6;
+          if (p6 && id(last_demand) && !demand && id(t1).state) {
+            id(hold) = true;
+            id(hold_timer).execute();
+          } else if (id(hold) && (!p6 || demand || !id(t1).state)) {
+            id(hold) = false;
+            id(hold_timer).stop();
+          }
+          id(last_demand) = demand;
+      - script.execute: update_relays
+
+  - id: hold_timer
+    mode: restart
+    then:
+      - delay: !lambda "return id(hold_max).state * 60000;"
+      - lambda: id(hold) = false;
+      - script.execute: update_relays
+
+  # Relays follow the active profile. Every input or profile change restarts
+  # the script, so relays only switch once the inputs have been stable for the
+  # configured delay.
   - id: update_relays
     mode: restart
     then:
@@ -236,6 +297,7 @@ script:
             case 3: out1 = in1;         out2 = in2 || in3;  out3 = in2 || in3;  break;
             case 4: out1 = out2 = out3 = in1 && (in2 || in3);                   break;
             case 5: out1 = in2 || in3;  out2 = in2;         out3 = in3;         break;
+            case 6: out1 = out2 = out3 = in2 || in3 || id(hold);                break;
             default: return;
           }
 
