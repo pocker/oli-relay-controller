@@ -43,6 +43,11 @@ logger:
 api:
   encryption:
     key: !secret futes_rele_api_key
+  # Reboot if no API client (HA) has been connected for this long (default 15min).
+  # The Wi-Fi drops seen 2026-10-14/25 kept the AP association without working IP;
+  # the default timeouts meant ~21 min outages. A longer HA outage now causes a
+  # reboot every 10 min — harmless, relays are restored on boot.
+  reboot_timeout: 10min
 
 wifi:
   # WiFi credentials
@@ -51,6 +56,7 @@ wifi:
   power_save_mode: none
   output_power: 15dB  # Reduced from default 20dB to lower power consumption and prevent brownout
   min_auth_mode: WPA2  # Explicit security mode setting (recommended by ESPHome 2025.11+)
+  reboot_timeout: 3min  # Reboot if Wi-Fi stays disconnected this long (default 15min)
   manual_ip:    
     static_ip: 192.168.1.81    
     gateway: 192.168.1.1    
