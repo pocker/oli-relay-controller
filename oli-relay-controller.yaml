@@ -56,20 +56,19 @@ wifi:
   power_save_mode: none
   output_power: 15dB  # Reduced from default 20dB to lower power consumption and prevent brownout
   min_auth_mode: WPA2  # Explicit security mode setting (recommended by ESPHome 2025.11+)
-  reboot_timeout: 3min  # Reboot if Wi-Fi stays disconnected this long (default 15min)
+  # Reboot if Wi-Fi stays disconnected this long (default 15min). ESPHome
+  # ignores this timer while a fallback `ap:` is configured, so there is none.
+  reboot_timeout: 3min
   manual_ip:    
     static_ip: 192.168.1.81    
     gateway: 192.168.1.1    
     subnet: 255.255.255.0
     dns1: 192.168.1.1
     dns2: 8.8.8.8
-  
-  # Enable fallback hotspot (captive portal) if WiFi connection fails
-  ap:
-    ssid: 'relay-controller-ap'
-    password: !secret relay_ap_password
 
-captive_portal:  # This component automatically enables OTA
+# Reset reason of the last boot (e.g. brownout, watchdog), reported to HA
+debug:
+  update_interval: 60s
 
 # Profile 6 circulation hold state
 globals:
@@ -120,6 +119,10 @@ text_sensor:
     scan_results:
       name: "Wifi Scan"
       icon: "mdi:wifi-refresh"
+      entity_category: diagnostic
+  - platform: debug
+    reset_reason:
+      name: "Reset Reason"
       entity_category: diagnostic
   - platform: uptime
     name: Uptime
